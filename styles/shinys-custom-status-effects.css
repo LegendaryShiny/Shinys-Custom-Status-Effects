@@ -36,21 +36,51 @@
   width: auto;
 }
 
+/* Icon field: text input should take the space, the file-picker
+   button should be small and square next to it. */
+.scse-config-app .icon-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.scse-config-app .icon-field .cond-img {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.scse-config-app .icon-field .pick-image {
+  flex: 0 0 auto;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  line-height: 1;
+}
+
 /* ============================================== */
 /*  Token HUD: name next to each status icon       */
 /* ============================================== */
 
+/* Let the whole palette grow instead of scrolling, and give it room
+   for icon + text side by side. */
 .status-effects.scse-enhanced {
   display: grid !important;
-  grid-template-columns: repeat(4, minmax(110px, 1fr)) !important;
-  gap: 2px 10px !important;
-  width: 460px !important;
+  grid-template-columns: repeat(4, minmax(120px, 1fr)) !important;
+  grid-auto-rows: min-content;
+  gap: 4px 12px !important;
+  width: 480px !important;
   max-width: 90vw;
+  max-height: none !important;
+  overflow: visible !important;
 }
 
-.status-effects.scse-enhanced .effect-control,
-.status-effects.scse-enhanced .scse-wrapper {
-  display: flex !important;
+/* Only re-style icons we actually managed to wrap + label. Anything we
+   couldn't identify is left completely untouched, so it keeps its
+   normal Foundry size instead of collapsing/ballooning. */
+.status-effects.scse-enhanced .scse-wrapper,
+.status-effects.scse-enhanced .effect-control:has(.scse-label) {
+  display: inline-flex !important;
   align-items: center;
   gap: 6px;
   width: auto !important;
@@ -62,8 +92,8 @@
 }
 
 .status-effects.scse-enhanced .scse-wrapper .scse-icon-img {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   flex: 0 0 auto;
 }
 
@@ -75,4 +105,5 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  pointer-events: none;
 }

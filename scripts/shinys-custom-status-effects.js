@@ -199,16 +199,39 @@ Hooks.on("renderTokenHUD", (_app, html) => {
 
   container.classList.add("scse-enhanced");
 
+  const isArrayConfig = Array.isArray(CONFIG.statusEffects);
+  const allEffects = isArrayConfig ? CONFIG.statusEffects : Object.values(CONFIG.statusEffects);
+
   const controls = container.querySelectorAll(".effect-control");
   controls.forEach((el) => {
     if (el.dataset.scseDone) return;
     el.dataset.scseDone = "true";
 
-    const label = el.dataset.tooltip
-      || el.getAttribute("title")
-      || el.getAttribute("aria-label")
+    // Try to identify which status this icon represents, then look its
+    // name up from CONFIG.statusEffects — far more reliable than scraping
+    // a tooltip attribute, which isn't consistent across Foundry versions.
+    const statusId = el.dataset.statusId
+      || el.getAttribute("data-status-id")
+      || el.dataset.effect
+      || el.getAttribute("data-effect")
       || "";
-    if (!label) return;
+
+    let cfg = statusId ? allEffects.find(e => e.id === statusId) : null;
+
+    if (!cfg) {
+      const src = el.tagName === "IMG" ? el.getAttribute("src") : "";
+      if (src) cfg = allEffects.find(e => (e.img || e.icon) && src.includes(e.img || e.icon));
+    }
+
+    let label = cfg ? game.i18n.localize(cfg.name || cfg.label || "") : "";
+    if (!label) {
+      label = el.dataset.tooltip || el.getAttribute("title") || el.getAttribute("aria-label") || "";
+    }
+
+    if (!label) {
+      console.debug(`${MODULE_ID} | Could not determine a label for this icon:`, el);
+      return;
+    }
 
     if (el.tagName === "IMG") {
       // <img> elements can't render child nodes, so wrap the icon in a

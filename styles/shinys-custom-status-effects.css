@@ -1,21 +1,78 @@
-/* Zeigt den Namen jeder Condition als kleines Label direkt am Icon
-   im "Assign Status Effect"-Panel des Token-HUD. */
+/* ============================================== */
+/*  Management window (table with inline editing)  */
+/* ============================================== */
 
-.status-effects .effect-control {
-  position: relative;
-  overflow: visible;
+.scse-config-app .scse-list {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 0.75em;
 }
 
-.status-effects .effect-control .scse-label {
-  position: absolute;
-  left: 50%;
-  bottom: -14px;
-  transform: translateX(-50%);
-  font-size: 9px;
-  line-height: 1.1;
-  color: #fff;
-  text-shadow: 0 0 2px #000, 0 0 3px #000;
+.scse-config-app .scse-list th {
+  text-align: left;
+  padding: 4px 6px;
+  border-bottom: 2px solid var(--color-border-dark-tertiary, #666);
+}
+
+.scse-config-app .scse-list td {
+  padding: 3px 6px;
+  vertical-align: middle;
+}
+
+.scse-config-app .scse-list tr.cond-row:nth-child(even) {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.scse-config-app .scse-list input[type="text"] {
+  width: 100%;
+}
+
+.scse-config-app .delete-condition {
+  color: #b33;
+  cursor: pointer;
+}
+
+.scse-config-app .add-condition {
+  width: auto;
+}
+
+/* ============================================== */
+/*  Token HUD: name next to each status icon       */
+/* ============================================== */
+
+.status-effects.scse-enhanced {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(110px, 1fr)) !important;
+  gap: 2px 10px !important;
+  width: 460px !important;
+  max-width: 90vw;
+}
+
+.status-effects.scse-enhanced .effect-control,
+.status-effects.scse-enhanced .scse-wrapper {
+  display: flex !important;
+  align-items: center;
+  gap: 6px;
+  width: auto !important;
+  height: auto !important;
+  padding: 2px 4px;
+  background: none !important;
+  border: none !important;
+  box-sizing: border-box;
+}
+
+.status-effects.scse-enhanced .scse-wrapper .scse-icon-img {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+
+.status-effects.scse-enhanced .scse-label {
+  font-size: 12px;
+  line-height: 1.2;
+  color: #eee;
+  text-shadow: none;
   white-space: nowrap;
-  pointer-events: none;
-  z-index: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

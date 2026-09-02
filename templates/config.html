@@ -1,61 +1,46 @@
 <form class="scse-config">
   <p class="notes">
-    Änderungen werden sofort gespeichert. Foundry danach einmal neu laden
-    (F5), damit neue/entfernte Zustände im Token-HUD aktualisiert werden.
+    Changes save automatically as you edit. Reload Foundry (F5) afterwards
+    so the Token HUD picks up added, edited, or removed conditions.
   </p>
 
-  <table class="scse-list" style="width: 100%; margin-bottom: 1em;">
+  <table class="scse-list">
     <thead>
       <tr>
         <th style="width: 32px;"></th>
-        <th>Name</th>
         <th>ID</th>
+        <th>Name</th>
+        <th>Icon</th>
         <th style="width: 32px;"></th>
       </tr>
     </thead>
     <tbody>
       {{#each conditions as |c|}}
-      <tr>
-        <td><img src="{{c.img}}" width="24" height="24" style="border: none;"></td>
-        <td>{{c.name}}</td>
-        <td><code>{{c.id}}</code></td>
+      <tr class="cond-row" data-id="{{c.id}}">
+        <td><img class="cond-preview" src="{{c.img}}" width="24" height="24" style="border: none;"></td>
+        <td><input type="text" class="cond-id" value="{{c.id}}"></td>
+        <td><input type="text" class="cond-name" value="{{c.name}}"></td>
         <td>
-          <a class="delete-condition" data-id="{{c.id}}" title="Entfernen">
+          <div style="display: flex; gap: 4px;">
+            <input type="text" class="cond-img" value="{{c.img}}" style="flex: 1;">
+            <button type="button" class="pick-image" title="Choose icon">
+              <i class="fas fa-file-image"></i>
+            </button>
+          </div>
+        </td>
+        <td>
+          <a class="delete-condition" title="Delete">
             <i class="fas fa-trash"></i>
           </a>
         </td>
       </tr>
       {{else}}
-      <tr><td colspan="4"><em>Noch keine eigenen Zustände.</em></td></tr>
+      <tr><td colspan="5"><em>No custom conditions yet.</em></td></tr>
       {{/each}}
     </tbody>
   </table>
 
-  <hr>
-
-  <h3>Neue Condition hinzufügen</h3>
-
-  <div class="form-group">
-    <label>ID (eindeutig, nur Buchstaben/Zahlen/Bindestriche)</label>
-    <input type="text" name="newId" placeholder="z.b. mein-effekt">
-  </div>
-
-  <div class="form-group">
-    <label>Anzeigename</label>
-    <input type="text" name="newName" placeholder="z.b. Mein Effekt">
-  </div>
-
-  <div class="form-group">
-    <label>Icon</label>
-    <div style="display: flex; gap: 4px;">
-      <input type="text" name="newImg" placeholder="icons/svg/aura.svg" style="flex: 1;">
-      <button type="button" class="pick-image" title="Icon auswählen">
-        <i class="fas fa-file-image"></i>
-      </button>
-    </div>
-  </div>
-
   <button type="button" class="add-condition">
-    <i class="fas fa-plus"></i> Hinzufügen
+    <i class="fas fa-plus"></i> Add Condition
   </button>
 </form>

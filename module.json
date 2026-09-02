@@ -1,14 +1,14 @@
 {
   "id": "shinys-custom-status-effects",
   "title": "Shiny's Custom Status Effects",
-  "description": "Fügt eigene Zustände (z. B. für Zaubereffekte) zum Token-HUD hinzu. Verwaltung direkt über die Foundry-Moduleinstellungen, Namen werden als Label an den Icons angezeigt.",
-  "version": "1.0.0",
+  "description": "Adds custom status effects to the Token HUD, with names shown next to each icon. Manage effects entirely from the module settings, including inline editing.",
+  "version": "1.1.0",
   "compatibility": {
     "minimum": "11",
     "verified": "14"
   },
   "authors": [
-    { "name": "Shiny" }
+    { "name": "Emil" }
   ],
   "scripts": ["scripts/shinys-custom-status-effects.js"],
   "esmodules": [],
@@ -17,5 +17,5 @@
   "socket": false,
   "url": "https://github.com/LegendaryShiny/shinys-custom-status-effects",
   "manifest": "https://github.com/LegendaryShiny/shinys-custom-status-effects/releases/latest/download/module.json",
-  "download": "https://github.com/LegendaryShiny/Shinys-Custom-Status-Effects/releases/download/v1.0.0/Shinys-Custom-Status-Effects.zip"
+  "download": "https://github.com/LegendaryShiny/shinys-custom-status-effects/releases/download/v1.1.0/shinys-custom-status-effects.zip"
 }

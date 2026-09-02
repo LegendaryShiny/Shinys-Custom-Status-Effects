@@ -1,29 +1,32 @@
 # Shiny's Custom Status Effects
 
-Fügt eigene Zustände zum Token-HUD hinzu (das Panel, das aufklappt, wenn du
-einen Token auswählst und auf "Assign Status Effect" klickst). Namen werden
-zusätzlich als kleines Label unter jedem Icon angezeigt.
+Adds custom status effects to the Token HUD (the panel that opens when you
+select a token and click "Assign Status Effect"). Each effect's name is
+shown next to its icon, and everything is managed from an in-app settings
+menu — no file editing required.
 
-## Eigene Zustände verwalten
+## Managing conditions
 
-1. In der Welt: **Game Settings → Configure Settings → Module Settings**
-2. Bei "Shiny's Custom Status Effects" auf **"Zustände verwalten"** klicken
-3. Neue Condition mit ID, Name und Icon hinzufügen (Datei-Browser-Button
-   für eigene Bilder oder Foundrys eingebaute `icons/svg/...`-Icons),
-   bestehende über den Papierkorb entfernen
-4. Einmal F5 drücken, damit die Änderung im Token-HUD sichtbar wird
+1. In your world: **Game Settings → Configure Settings → Module Settings**
+2. Under "Shiny's Custom Status Effects", click **"Manage Conditions"**
+3. Edit any field directly in the table (ID, Name, Icon path) — changes
+   save automatically when you click away from a field
+4. Use the file-picker button next to the Icon field to browse Foundry's
+   built-in icons (`icons/svg/...`) or your own images
+5. Click **"+ Add Condition"** for a new blank row, or the trash icon to
+   remove one
+6. Reload Foundry (F5) afterwards so the Token HUD reflects your changes
 
-Die Liste wird als Welt-Einstellung gespeichert, gilt also für alle Spieler.
+Conditions are stored as a world-scoped setting, so they apply for
+everyone in that world.
 
-## Für Entwickler: Version aktualisieren
+## Updating this module on GitHub
 
-Siehe Installationsanleitung für den vollständigen GitHub-Release-Workflow.
-Kurzfassung:
-
-1. Code ändern
-2. `version` in `module.json` erhöhen (z.B. `1.0.0` → `1.1.0`)
-3. Ordner neu zippen, `module.json` liegt im Zip an der Wurzel
-4. Neuen GitHub Release mit Tag `v1.1.0` erstellen, `module.json` und die
-   ZIP als Release-Assets anhängen
-5. Foundry erkennt das Update automatisch (Manage Modules zeigt "Update
-   Available")
+1. Make your code changes
+2. Bump `version` in `module.json` (e.g. `1.1.0` → `1.2.0`)
+3. Update the `download` field in `module.json` to match the new tag
+4. Re-zip the folder (`module.json` at the root of the zip)
+5. Create a new GitHub Release with a matching tag (e.g. `v1.2.0`),
+   attaching `module.json` and the zip as release assets
+6. Foundry will show "Update Available" in Manage Modules automatically,
+   since the manifest URL always points at `releases/latest/download/...`

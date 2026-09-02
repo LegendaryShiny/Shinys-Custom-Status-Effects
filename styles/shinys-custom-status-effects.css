@@ -1,0 +1,21 @@
+/* Zeigt den Namen jeder Condition als kleines Label direkt am Icon
+   im "Assign Status Effect"-Panel des Token-HUD. */
+
+.status-effects .effect-control {
+  position: relative;
+  overflow: visible;
+}
+
+.status-effects .effect-control .scse-label {
+  position: absolute;
+  left: 50%;
+  bottom: -14px;
+  transform: translateX(-50%);
+  font-size: 9px;
+  line-height: 1.1;
+  color: #fff;
+  text-shadow: 0 0 2px #000, 0 0 3px #000;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 1;
+}

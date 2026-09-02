@@ -5,7 +5,7 @@ select a token and click "Assign Status Effect"). Each effect's name is
 shown next to its icon, and everything is managed from an in-app settings
 menu — no file editing required.
 
-## Managing conditions
+## Managing your own conditions
 
 1. In your world: **Game Settings → Configure Settings → Module Settings**
 2. Under "Shiny's Custom Status Effects", click **"Manage Conditions"**
@@ -17,17 +17,27 @@ menu — no file editing required.
    remove one
 6. Use **Export** to download your conditions as a JSON file, and
    **Import** to add conditions from a previously exported file (existing
-   IDs are skipped, so importing is safe to repeat)
+   IDs are skipped, so importing is safe to repeat) — handy for carrying
+   your set over to another world
 7. Reload Foundry (F5), or use **Save & Reload**, so the Token HUD
    reflects your changes
 
 Conditions are stored as a world-scoped setting, so they apply for
 everyone in that world.
 
+## Managing built-in conditions
+
+Click **"Manage Built-in Conditions"** (next to "Manage Conditions") to
+rename, re-icon, or hide any of the system's default conditions from the
+Token HUD — without deleting them. Use the checkbox in the "In HUD"
+column to hide one, and the reset icon to restore its original name/icon.
+
 ## Token HUD extras
 
 - A **search box** at the top of the "Assign Status Effect" panel filters
   the list live as you type
+- Icons are sorted alphabetically by name, custom and built-in mixed
+  together
 - A **Clear All** button at the bottom removes every active condition
   from the selected token in one click
 
@@ -38,20 +48,3 @@ that token's currently active conditions with icon and name — handy since
 the Token HUD icons alone don't show text. Toggle this on/off per-player
 under **Game Settings → Configure Settings → Module Settings →
 "Show active conditions on hover"**.
-
-## Updating this module on GitHub
-
-This module is installed straight from raw files on the `main` branch —
-no GitHub Releases needed. To publish an update:
-
-1. Make your code changes
-2. Bump `version` in `module.json` (e.g. `1.3.1` → `1.4.0`)
-3. Re-zip the folder (`module.json` at the root of the zip) and overwrite
-   `shinys-custom-status-effects.zip` in the repo (same filename)
-4. Upload/overwrite the changed files (including `module.json`) on `main`
-
-Because `manifest` and `download` in `module.json` both point at fixed
-raw-file URLs on the `main` branch, Foundry always fetches whatever is
-currently committed there — as soon as the version number is higher than
-what's installed, "Manage Modules" will offer an **Update** button, no
-manual reinstall required.

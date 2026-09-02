@@ -154,15 +154,10 @@ class ShinysStatusEffectsConfig extends FormApplication {
     const conditions = game.settings.get(MODULE_ID, SETTING_KEY) ?? [];
     const data = JSON.stringify(conditions, null, 2);
 
-    const blob = new Blob([data], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "shinys-custom-status-effects-export.json";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    // Foundry's own helper reliably triggers a real file download instead
+    // of opening the content in a new tab (which a plain <a download> link
+    // can run into inside Foundry's UI).
+    saveDataToFile(data, "text/json", "shinys-custom-status-effects-export.json");
   }
 
   _onImportClick(event) {

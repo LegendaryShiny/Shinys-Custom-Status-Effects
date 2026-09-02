@@ -65,13 +65,25 @@
   border-top: 1px solid var(--color-border-dark-tertiary, #666);
   padding-top: 0.75em;
   display: flex;
+  align-items: stretch;
   justify-content: flex-end;
   gap: 8px;
 }
 
-.scse-config-app .save-reload {
+.scse-config-app .export-conditions,
+.scse-config-app .import-conditions {
+  flex: 0 0 auto;
   width: auto;
+  font-size: 12px;
+  padding: 2px 10px;
+}
+
+.scse-config-app .save-reload {
+  flex: 1 1 auto;
+  width: auto;
+  font-size: 14px;
   font-weight: bold;
+  padding: 6px 12px;
 }
 
 .scse-config-app .reset-builtin {

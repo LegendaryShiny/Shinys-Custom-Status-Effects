@@ -44,47 +44,9 @@
     <i class="fas fa-plus"></i> Add Condition
   </button>
 
-  <details class="builtin-section">
-    <summary>Built-in Conditions ({{builtins.length}}) — rename, re-icon, or hide from the HUD</summary>
-
-    <table class="scse-list">
-      <thead>
-        <tr>
-          <th style="width: 32px;"></th>
-          <th>Name</th>
-          <th>ID</th>
-          <th>Icon</th>
-          <th style="width: 70px;">In HUD</th>
-          <th style="width: 32px;"></th>
-        </tr>
-      </thead>
-      <tbody>
-        {{#each builtins as |b|}}
-        <tr class="builtin-row" data-id="{{b.id}}">
-          <td><img class="cond-preview" src="{{b.img}}" width="24" height="24" style="border: none;"></td>
-          <td><input type="text" class="builtin-name" value="{{b.name}}"></td>
-          <td><code>{{b.id}}</code></td>
-          <td>
-            <div class="icon-field">
-              <input type="text" class="builtin-img" value="{{b.img}}">
-              <button type="button" class="pick-image-builtin" title="Choose icon">
-                <i class="fas fa-file-image"></i>
-              </button>
-            </div>
-          </td>
-          <td style="text-align: center;">
-            <input type="checkbox" class="builtin-visible" {{#unless b.hidden}}checked{{/unless}}>
-          </td>
-          <td>
-            <a class="reset-builtin" title="Reset to default">
-              <i class="fas fa-rotate-left"></i>
-            </a>
-          </td>
-        </tr>
-        {{else}}
-        <tr><td colspan="6"><em>No built-in conditions found.</em></td></tr>
-        {{/each}}
-      </tbody>
-    </table>
-  </details>
+  <div class="scse-actions">
+    <button type="button" class="save-reload">
+      <i class="fas fa-rotate"></i> Save &amp; Reload
+    </button>
+  </div>
 </form>

@@ -60,16 +60,17 @@
   line-height: 1;
 }
 
-.scse-config-app .builtin-section {
+.scse-config-app .scse-actions {
   margin-top: 1em;
   border-top: 1px solid var(--color-border-dark-tertiary, #666);
-  padding-top: 0.5em;
+  padding-top: 0.75em;
+  display: flex;
+  justify-content: flex-end;
 }
 
-.scse-config-app .builtin-section summary {
-  cursor: pointer;
+.scse-config-app .save-reload {
+  width: auto;
   font-weight: bold;
-  margin-bottom: 0.5em;
 }
 
 .scse-config-app .reset-builtin {

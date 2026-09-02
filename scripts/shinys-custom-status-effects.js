@@ -31,27 +31,7 @@ class ShinysStatusEffectsConfig extends FormApplication {
   }
 
   getData() {
-    const conditions = game.settings.get(MODULE_ID, SETTING_KEY) ?? [];
-    const overrides = game.settings.get(MODULE_ID, OVERRIDE_KEY) ?? {};
-    const customIds = new Set(conditions.map(c => c.id));
-
-    const isArrayConfig = Array.isArray(CONFIG.statusEffects);
-    const allEffects = isArrayConfig ? CONFIG.statusEffects : Object.values(CONFIG.statusEffects);
-
-    const builtins = allEffects
-      .filter(e => e.id && !customIds.has(e.id))
-      .map(e => {
-        const o = overrides[e.id] ?? {};
-        return {
-          id: e.id,
-          name: o.name ?? game.i18n.localize(e.name || e.label || e.id),
-          img: o.img ?? e.img ?? e.icon ?? "",
-          hidden: !!o.hidden
-        };
-      })
-      .sort((a, b) => a.name.localeCompare(b.name));
-
-    return { conditions, builtins };
+    return { conditions: game.settings.get(MODULE_ID, SETTING_KEY) ?? [] };
   }
 
   activateListeners(html) {
@@ -68,11 +48,7 @@ class ShinysStatusEffectsConfig extends FormApplication {
     // Live-update the icon preview while typing the image path
     html.find(".cond-img").on("input", this._onImgPreview.bind(this));
 
-    // Built-in conditions section
-    html.find(".pick-image-builtin").on("click", (ev) => this._openFilePicker(ev, ".builtin-img"));
-    html.find(".builtin-img").on("input", this._onImgPreview.bind(this));
-    html.find(".builtin-row input").on("change", this._onBuiltinChange.bind(this));
-    html.find(".reset-builtin").on("click", this._onBuiltinReset.bind(this));
+    html.find(".save-reload").on("click", this._onSaveAndReload.bind(this));
   }
 
   _openFilePicker(event, inputSelector) {
@@ -109,40 +85,6 @@ class ShinysStatusEffectsConfig extends FormApplication {
     this.render();
   }
 
-  async _onBuiltinChange(event) {
-    const row = event.currentTarget.closest(".builtin-row");
-    const id = row.dataset.id;
-
-    const overrides = foundry.utils.deepClone(game.settings.get(MODULE_ID, OVERRIDE_KEY) ?? {});
-
-    const name = row.querySelector(".builtin-name").value.trim();
-    const img = row.querySelector(".builtin-img").value.trim();
-    const visibleInHud = row.querySelector(".builtin-visible").checked;
-
-    const next = {};
-    if (name) next.name = name;
-    if (img) next.img = img;
-    if (!visibleInHud) next.hidden = true;
-
-    if (Object.keys(next).length === 0) delete overrides[id];
-    else overrides[id] = next;
-
-    await game.settings.set(MODULE_ID, OVERRIDE_KEY, overrides);
-    ui.notifications.info("Saved. Reload Foundry (F5) for the Token HUD to update.");
-  }
-
-  async _onBuiltinReset(event) {
-    event.preventDefault();
-    const row = event.currentTarget.closest(".builtin-row");
-    const id = row.dataset.id;
-
-    const overrides = foundry.utils.deepClone(game.settings.get(MODULE_ID, OVERRIDE_KEY) ?? {});
-    delete overrides[id];
-
-    await game.settings.set(MODULE_ID, OVERRIDE_KEY, overrides);
-    this.render();
-  }
-
   async _onRowChange(event) {
     const row = event.currentTarget.closest(".cond-row");
     const originalId = row.dataset.id;
@@ -173,7 +115,6 @@ class ShinysStatusEffectsConfig extends FormApplication {
     conditions[index] = { id, name, img };
     await game.settings.set(MODULE_ID, SETTING_KEY, conditions);
     row.dataset.id = id;
-    ui.notifications.info(`"${name}" saved. Reload Foundry (F5) for the Token HUD to pick it up.`);
   }
 
   async _onAdd(event) {
@@ -186,6 +127,156 @@ class ShinysStatusEffectsConfig extends FormApplication {
 
     await game.settings.set(MODULE_ID, SETTING_KEY, conditions);
     this.render();
+  }
+
+  async _onSaveAndReload(event) {
+    event.preventDefault();
+
+    // Re-collect every row directly from the DOM so any edit still sitting
+    // in a focused field (not yet blurred) is captured before we reload.
+    const conditions = [];
+    this.element.find(".cond-row").each((_, row) => {
+      const id = row.querySelector(".cond-id")?.value.trim();
+      const name = row.querySelector(".cond-name")?.value.trim();
+      const img = row.querySelector(".cond-img")?.value.trim();
+      if (id && name && img) conditions.push({ id, name, img });
+    });
+
+    await game.settings.set(MODULE_ID, SETTING_KEY, conditions);
+    window.location.reload();
+  }
+
+  async _updateObject() {
+    // Saving happens per-row on change, nothing to do on submit.
+  }
+}
+
+/* -------------------------------------------- */
+/*  Settings menu: built-in conditions           */
+/* -------------------------------------------- */
+
+class ShinysBuiltinConditionsConfig extends FormApplication {
+  static get defaultOptions() {
+    return foundry.utils.mergeObject(super.defaultOptions, {
+      id: "shinys-builtin-conditions-config",
+      title: "Shiny's Custom Status Effects – Manage Built-in Conditions",
+      template: `modules/${MODULE_ID}/templates/builtin.html`,
+      width: 640,
+      height: "auto",
+      closeOnSubmit: false,
+      classes: ["scse-config-app"]
+    });
+  }
+
+  getData() {
+    const conditions = game.settings.get(MODULE_ID, SETTING_KEY) ?? [];
+    const overrides = game.settings.get(MODULE_ID, OVERRIDE_KEY) ?? {};
+    const customIds = new Set(conditions.map(c => c.id));
+
+    const isArrayConfig = Array.isArray(CONFIG.statusEffects);
+    const allEffects = isArrayConfig ? CONFIG.statusEffects : Object.values(CONFIG.statusEffects);
+
+    const builtins = allEffects
+      .filter(e => e.id && !customIds.has(e.id))
+      .map(e => {
+        const o = overrides[e.id] ?? {};
+        return {
+          id: e.id,
+          name: o.name ?? game.i18n.localize(e.name || e.label || e.id),
+          img: o.img ?? e.img ?? e.icon ?? "",
+          hidden: !!o.hidden
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    return { builtins };
+  }
+
+  activateListeners(html) {
+    super.activateListeners(html);
+    html.on("submit", (ev) => ev.preventDefault());
+
+    html.find(".pick-image-builtin").on("click", (ev) => this._openFilePicker(ev, ".builtin-img"));
+    html.find(".builtin-img").on("input", this._onImgPreview.bind(this));
+    html.find(".builtin-row input").on("change", this._onBuiltinChange.bind(this));
+    html.find(".reset-builtin").on("click", this._onBuiltinReset.bind(this));
+    html.find(".save-reload").on("click", this._onSaveAndReload.bind(this));
+  }
+
+  _openFilePicker(event, inputSelector) {
+    event.preventDefault();
+    const row = event.currentTarget.closest("tr");
+    const input = row.querySelector(inputSelector);
+    const fp = new FilePicker({
+      type: "image",
+      current: input.value,
+      callback: (path) => {
+        input.value = path;
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    });
+    fp.render(true);
+  }
+
+  _onImgPreview(event) {
+    const row = event.currentTarget.closest(".builtin-row");
+    const preview = row?.querySelector(".cond-preview");
+    if (preview) preview.src = event.currentTarget.value;
+  }
+
+  async _onBuiltinChange(event) {
+    const row = event.currentTarget.closest(".builtin-row");
+    const id = row.dataset.id;
+
+    const overrides = foundry.utils.deepClone(game.settings.get(MODULE_ID, OVERRIDE_KEY) ?? {});
+
+    const name = row.querySelector(".builtin-name").value.trim();
+    const img = row.querySelector(".builtin-img").value.trim();
+    const visibleInHud = row.querySelector(".builtin-visible").checked;
+
+    const next = {};
+    if (name) next.name = name;
+    if (img) next.img = img;
+    if (!visibleInHud) next.hidden = true;
+
+    if (Object.keys(next).length === 0) delete overrides[id];
+    else overrides[id] = next;
+
+    await game.settings.set(MODULE_ID, OVERRIDE_KEY, overrides);
+  }
+
+  async _onBuiltinReset(event) {
+    event.preventDefault();
+    const row = event.currentTarget.closest(".builtin-row");
+    const id = row.dataset.id;
+
+    const overrides = foundry.utils.deepClone(game.settings.get(MODULE_ID, OVERRIDE_KEY) ?? {});
+    delete overrides[id];
+
+    await game.settings.set(MODULE_ID, OVERRIDE_KEY, overrides);
+    this.render();
+  }
+
+  async _onSaveAndReload(event) {
+    event.preventDefault();
+
+    const overrides = {};
+    this.element.find(".builtin-row").each((_, row) => {
+      const id = row.dataset.id;
+      const name = row.querySelector(".builtin-name")?.value.trim();
+      const img = row.querySelector(".builtin-img")?.value.trim();
+      const visibleInHud = row.querySelector(".builtin-visible")?.checked;
+
+      const next = {};
+      if (name) next.name = name;
+      if (img) next.img = img;
+      if (!visibleInHud) next.hidden = true;
+      if (Object.keys(next).length) overrides[id] = next;
+    });
+
+    await game.settings.set(MODULE_ID, OVERRIDE_KEY, overrides);
+    window.location.reload();
   }
 
   async _updateObject() {
@@ -218,6 +309,15 @@ Hooks.once("init", () => {
     hint: "Add, edit, or remove custom conditions (e.g. for spell effects).",
     icon: "fas fa-star",
     type: ShinysStatusEffectsConfig,
+    restricted: true
+  });
+
+  game.settings.registerMenu(MODULE_ID, "builtinConditionsMenu", {
+    name: "Built-in Conditions",
+    label: "Manage Built-in Conditions",
+    hint: "Rename, re-icon, or hide the system's default conditions from the Token HUD.",
+    icon: "fas fa-shield-halved",
+    type: ShinysBuiltinConditionsConfig,
     restricted: true
   });
 });

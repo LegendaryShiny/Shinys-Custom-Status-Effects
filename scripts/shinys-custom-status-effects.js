@@ -49,6 +49,9 @@ class ShinysStatusEffectsConfig extends FormApplication {
     html.find(".cond-img").on("input", this._onImgPreview.bind(this));
 
     html.find(".save-reload").on("click", this._onSaveAndReload.bind(this));
+    html.find(".export-conditions").on("click", this._onExport.bind(this));
+    html.find(".import-conditions").on("click", this._onImportClick.bind(this));
+    html.find(".import-file-input").on("change", this._onImportFile.bind(this));
   }
 
   _openFilePicker(event, inputSelector) {
@@ -144,6 +147,63 @@ class ShinysStatusEffectsConfig extends FormApplication {
 
     await game.settings.set(MODULE_ID, SETTING_KEY, conditions);
     window.location.reload();
+  }
+
+  _onExport(event) {
+    event.preventDefault();
+    const conditions = game.settings.get(MODULE_ID, SETTING_KEY) ?? [];
+    const data = JSON.stringify(conditions, null, 2);
+
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "shinys-custom-status-effects-export.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  _onImportClick(event) {
+    event.preventDefault();
+    this.element.find(".import-file-input")[0]?.click();
+  }
+
+  async _onImportFile(event) {
+    const file = event.currentTarget.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const imported = JSON.parse(text);
+      if (!Array.isArray(imported)) throw new Error("Expected a JSON array");
+
+      const conditions = foundry.utils.deepClone(game.settings.get(MODULE_ID, SETTING_KEY) ?? []);
+      const existingIds = new Set(conditions.map(c => c.id));
+
+      let added = 0;
+      let skipped = 0;
+
+      for (const entry of imported) {
+        if (!entry?.id || !entry?.name || !entry?.img || existingIds.has(entry.id)) {
+          skipped++;
+          continue;
+        }
+        conditions.push({ id: entry.id, name: entry.name, img: entry.img });
+        existingIds.add(entry.id);
+        added++;
+      }
+
+      await game.settings.set(MODULE_ID, SETTING_KEY, conditions);
+      ui.notifications.info(`Imported ${added} condition(s)${skipped ? `, skipped ${skipped} (missing fields or duplicate ID)` : ""}.`);
+      this.render();
+    } catch (err) {
+      console.error(`${MODULE_ID} | Import failed:`, err);
+      ui.notifications.error("Could not import — make sure the file is a valid export from this module.");
+    } finally {
+      event.currentTarget.value = "";
+    }
   }
 
   async _updateObject() {
@@ -473,6 +533,35 @@ Hooks.on("renderTokenHUD", (_app, html) => {
   items.forEach(({ gridItem }, index) => {
     gridItem.style.order = index;
   });
+
+  // Search field, pinned to the top regardless of sort order, filters
+  // the grid items live as you type.
+  if (!container.querySelector(".scse-search")) {
+    const searchWrap = document.createElement("div");
+    searchWrap.className = "scse-search-wrap";
+    searchWrap.style.order = -1;
+
+    const searchInput = document.createElement("input");
+    searchInput.type = "text";
+    searchInput.className = "scse-search";
+    searchInput.placeholder = "Search conditions…";
+
+    // Don't let typing here bubble up to canvas hotkeys or close the HUD
+    searchInput.addEventListener("click", (ev) => ev.stopPropagation());
+    searchInput.addEventListener("keydown", (ev) => ev.stopPropagation());
+    searchInput.addEventListener("keyup", (ev) => ev.stopPropagation());
+
+    searchInput.addEventListener("input", (ev) => {
+      const term = ev.currentTarget.value.trim().toLowerCase();
+      items.forEach(({ gridItem, label }) => {
+        const match = !term || label.toLowerCase().includes(term);
+        gridItem.classList.toggle("scse-hidden", !match);
+      });
+    });
+
+    searchWrap.appendChild(searchInput);
+    container.appendChild(searchWrap);
+  }
 
   // "Clear All" button, pinned to the bottom of the palette regardless
   // of sort order.

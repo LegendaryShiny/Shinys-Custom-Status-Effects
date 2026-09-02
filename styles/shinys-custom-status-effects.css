@@ -66,6 +66,7 @@
   padding-top: 0.75em;
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
 }
 
 .scse-config-app .save-reload {
@@ -215,4 +216,32 @@
 
 .status-effects.scse-enhanced .scse-clear-all:hover {
   background: rgba(255, 255, 255, 0.18);
+}
+
+/* Search field pinned to the top of the status-effects palette */
+.status-effects.scse-enhanced .scse-search-wrap {
+  grid-column: 1 / -1;
+  margin-bottom: 4px;
+}
+
+.status-effects.scse-enhanced .scse-search {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 12px;
+  padding: 3px 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid #666;
+  border-radius: 3px;
+  color: #eee;
+}
+
+.status-effects.scse-enhanced .scse-search::placeholder {
+  color: #999;
+}
+
+/* Icons hidden by the search filter — needs to win against the
+   !important display rule used for wrapped/labeled icons above. */
+.status-effects.scse-enhanced .scse-wrapper.scse-hidden,
+.status-effects.scse-enhanced .effect-control.scse-hidden {
+  display: none !important;
 }

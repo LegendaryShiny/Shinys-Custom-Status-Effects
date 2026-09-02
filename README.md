@@ -15,12 +15,21 @@ menu — no file editing required.
    built-in icons (`icons/svg/...`) or your own images
 5. Click **"+ Add Condition"** for a new blank row, or the trash icon to
    remove one
-6. Expand **"Built-in Conditions"** to rename, re-icon, or hide any of the
-   system's default conditions from the HUD (without deleting them)
-7. Reload Foundry (F5) afterwards so the Token HUD reflects your changes
+6. Use **Export** to download your conditions as a JSON file, and
+   **Import** to add conditions from a previously exported file (existing
+   IDs are skipped, so importing is safe to repeat)
+7. Reload Foundry (F5), or use **Save & Reload**, so the Token HUD
+   reflects your changes
 
 Conditions are stored as a world-scoped setting, so they apply for
 everyone in that world.
+
+## Token HUD extras
+
+- A **search box** at the top of the "Assign Status Effect" panel filters
+  the list live as you type
+- A **Clear All** button at the bottom removes every active condition
+  from the selected token in one click
 
 ## Hover panel
 

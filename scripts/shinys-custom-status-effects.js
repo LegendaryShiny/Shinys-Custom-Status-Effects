@@ -363,8 +363,35 @@ Hooks.once("setup", () => {
     }
   }
 
+  sortStatusEffectsAlphabetically();
+
   console.log(`${MODULE_ID} | ${conditions.length} custom condition(s) loaded, ${Object.keys(overrides).length} built-in override(s) applied`);
 });
+
+/**
+ * Sorts CONFIG.statusEffects alphabetically by (localized) name, mixing
+ * custom and built-in conditions together instead of grouping them by
+ * when they were registered.
+ */
+function sortStatusEffectsAlphabetically() {
+  const getName = (e) => game.i18n.localize(e.name || e.label || e.id || "");
+
+  if (Array.isArray(CONFIG.statusEffects)) {
+    CONFIG.statusEffects.sort((a, b) => getName(a).localeCompare(getName(b)));
+    return;
+  }
+
+  // Object-keyed (v13+): reinsert entries in sorted order (JS objects
+  // iterate string keys in insertion order) AND set an explicit "order"
+  // field in case the HUD renders by that instead.
+  const entries = Object.entries(CONFIG.statusEffects)
+    .sort(([, a], [, b]) => getName(a).localeCompare(getName(b)));
+
+  entries.forEach(([, entry], index) => { entry.order = index; });
+
+  for (const key of Object.keys(CONFIG.statusEffects)) delete CONFIG.statusEffects[key];
+  for (const [key, entry] of entries) CONFIG.statusEffects[key] = entry;
+}
 
 /* -------------------------------------------- */
 /*  Show the name next to each icon in the HUD   */

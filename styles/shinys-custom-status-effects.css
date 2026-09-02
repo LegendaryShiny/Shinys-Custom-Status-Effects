@@ -44,12 +44,14 @@
   gap: 4px;
 }
 
-.scse-config-app .icon-field .cond-img {
+.scse-config-app .icon-field .cond-img,
+.scse-config-app .icon-field .builtin-img {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.scse-config-app .icon-field .pick-image {
+.scse-config-app .icon-field .pick-image,
+.scse-config-app .icon-field .pick-image-builtin {
   flex: 0 0 auto;
   width: 28px;
   min-width: 28px;
@@ -58,21 +60,41 @@
   line-height: 1;
 }
 
+.scse-config-app .builtin-section {
+  margin-top: 1em;
+  border-top: 1px solid var(--color-border-dark-tertiary, #666);
+  padding-top: 0.5em;
+}
+
+.scse-config-app .builtin-section summary {
+  cursor: pointer;
+  font-weight: bold;
+  margin-bottom: 0.5em;
+}
+
+.scse-config-app .reset-builtin {
+  color: #888;
+  cursor: pointer;
+}
+
 /* ============================================== */
 /*  Token HUD: name next to each status icon       */
 /* ============================================== */
 
 /* Let the whole palette grow instead of scrolling, and give it room
-   for icon + text side by side. */
+   for icon + text side by side. box-sizing + right padding keep the
+   text from overflowing past the panel's visible edge. */
 .status-effects.scse-enhanced {
   display: grid !important;
-  grid-template-columns: repeat(4, minmax(120px, 1fr)) !important;
+  grid-template-columns: repeat(4, minmax(100px, 1fr)) !important;
   grid-auto-rows: min-content;
-  gap: 4px 12px !important;
+  gap: 4px 8px !important;
   width: 480px !important;
   max-width: 90vw;
   max-height: none !important;
   overflow: visible !important;
+  box-sizing: border-box !important;
+  padding: 6px 16px 6px 6px !important;
 }
 
 /* Only re-style icons we actually managed to wrap + label. Anything we
@@ -83,8 +105,9 @@
   display: inline-flex !important;
   align-items: center;
   gap: 6px;
-  width: auto !important;
+  width: 100% !important;
   height: auto !important;
+  min-width: 0;
   padding: 2px 4px;
   background: none !important;
   border: none !important;
@@ -106,4 +129,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   pointer-events: none;
+  max-width: 100%;
+  min-width: 0;
 }

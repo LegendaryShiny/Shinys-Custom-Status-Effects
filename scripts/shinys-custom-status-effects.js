@@ -13,6 +13,11 @@ const DEFAULT_CONDITIONS = [
   { id: "custom-status", name: "Custom Status", img: "icons/svg/aura.svg" }
 ];
 
+// Populated in the "setup" hook with each built-in condition's untouched
+// name/icon, before any saved override is applied — lets the management
+// screen reset a row without needing a reload.
+const SCSE_BUILTIN_DEFAULTS = {};
+
 /* -------------------------------------------- */
 /*  Settings menu (FormApplication)              */
 /* -------------------------------------------- */
@@ -31,7 +36,12 @@ class ShinysStatusEffectsConfig extends FormApplication {
   }
 
   getData() {
-    return { conditions: game.settings.get(MODULE_ID, SETTING_KEY) ?? [] };
+    // Work on a local copy so nothing is written to settings until the
+    // user presses "Save & Reload" — closing the window discards edits.
+    if (!this._conditions) {
+      this._conditions = foundry.utils.deepClone(game.settings.get(MODULE_ID, SETTING_KEY) ?? []);
+    }
+    return { conditions: this._conditions };
   }
 
   activateListeners(html) {
@@ -43,8 +53,6 @@ class ShinysStatusEffectsConfig extends FormApplication {
     html.find(".delete-condition").on("click", this._onDelete.bind(this));
     html.find(".pick-image").on("click", (ev) => this._openFilePicker(ev, ".cond-img"));
 
-    // Save a row when any of its fields loses focus after a change
-    html.find(".cond-row input").on("change", this._onRowChange.bind(this));
     // Live-update the icon preview while typing the image path
     html.find(".cond-img").on("input", this._onImgPreview.bind(this));
 
@@ -52,6 +60,20 @@ class ShinysStatusEffectsConfig extends FormApplication {
     html.find(".export-conditions").on("click", this._onExport.bind(this));
     html.find(".import-conditions").on("click", this._onImportClick.bind(this));
     html.find(".import-file-input").on("change", this._onImportFile.bind(this));
+  }
+
+  // Reads the current (possibly unsaved) values straight out of the DOM
+  // and stores them as the working copy, preserving in-progress edits
+  // across an add/delete/import re-render.
+  _syncFromDom() {
+    const conditions = [];
+    this.element.find(".cond-row").each((_, row) => {
+      const id = row.querySelector(".cond-id")?.value.trim() ?? "";
+      const name = row.querySelector(".cond-name")?.value.trim() ?? "";
+      const img = row.querySelector(".cond-img")?.value.trim() ?? "";
+      conditions.push({ id, name, img });
+    });
+    this._conditions = conditions;
   }
 
   _openFilePicker(event, inputSelector) {
@@ -63,7 +85,6 @@ class ShinysStatusEffectsConfig extends FormApplication {
       current: input.value,
       callback: (path) => {
         input.value = path;
-        input.dispatchEvent(new Event("change", { bubbles: true }));
         input.dispatchEvent(new Event("input", { bubbles: true }));
       }
     });
@@ -76,74 +97,47 @@ class ShinysStatusEffectsConfig extends FormApplication {
     if (preview) preview.src = event.currentTarget.value;
   }
 
-  async _onDelete(event) {
+  _onDelete(event) {
     event.preventDefault();
     const row = event.currentTarget.closest(".cond-row");
-    const id = row.dataset.id;
+    const rows = this.element.find(".cond-row").toArray();
+    const index = rows.indexOf(row);
 
-    const conditions = foundry.utils.deepClone(game.settings.get(MODULE_ID, SETTING_KEY) ?? []);
-    const filtered = conditions.filter(c => c.id !== id);
-
-    await game.settings.set(MODULE_ID, SETTING_KEY, filtered);
+    this._syncFromDom();
+    if (index > -1) this._conditions.splice(index, 1);
     this.render();
   }
 
-  async _onRowChange(event) {
-    const row = event.currentTarget.closest(".cond-row");
-    const originalId = row.dataset.id;
-
-    const id = row.querySelector(".cond-id").value.trim();
-    const name = row.querySelector(".cond-name").value.trim();
-    const img = row.querySelector(".cond-img").value.trim();
-
-    if (!id || !name || !img) {
-      ui.notifications.warn("ID, Name, and Icon are all required.");
-      return;
-    }
-    if (!/^[a-z0-9-]+$/i.test(id)) {
-      ui.notifications.warn("ID may only contain letters, numbers, and hyphens.");
-      return;
-    }
-
-    const conditions = foundry.utils.deepClone(game.settings.get(MODULE_ID, SETTING_KEY) ?? []);
-    const index = conditions.findIndex(c => c.id === originalId);
-    if (index === -1) return;
-
-    const duplicate = conditions.some((c, i) => c.id === id && i !== index);
-    if (duplicate) {
-      ui.notifications.warn(`ID "${id}" is already in use.`);
-      return;
-    }
-
-    conditions[index] = { id, name, img };
-    await game.settings.set(MODULE_ID, SETTING_KEY, conditions);
-    row.dataset.id = id;
-  }
-
-  async _onAdd(event) {
+  _onAdd(event) {
     event.preventDefault();
-    const conditions = foundry.utils.deepClone(game.settings.get(MODULE_ID, SETTING_KEY) ?? []);
+    this._syncFromDom();
 
     let n = 1;
-    while (conditions.some(c => c.id === `new-effect-${n}`)) n++;
-    conditions.push({ id: `new-effect-${n}`, name: "New Effect", img: "icons/svg/aura.svg" });
+    while (this._conditions.some(c => c.id === `new-effect-${n}`)) n++;
+    this._conditions.push({ id: `new-effect-${n}`, name: "New Effect", img: "icons/svg/aura.svg" });
 
-    await game.settings.set(MODULE_ID, SETTING_KEY, conditions);
     this.render();
   }
 
   async _onSaveAndReload(event) {
     event.preventDefault();
+    this._syncFromDom();
 
-    // Re-collect every row directly from the DOM so any edit still sitting
-    // in a focused field (not yet blurred) is captured before we reload.
-    const conditions = [];
-    this.element.find(".cond-row").each((_, row) => {
-      const id = row.querySelector(".cond-id")?.value.trim();
-      const name = row.querySelector(".cond-name")?.value.trim();
-      const img = row.querySelector(".cond-img")?.value.trim();
-      if (id && name && img) conditions.push({ id, name, img });
-    });
+    const conditions = this._conditions.filter(c => c.id && c.name && c.img);
+
+    for (const c of conditions) {
+      if (!/^[a-z0-9-]+$/i.test(c.id)) {
+        ui.notifications.warn(`ID "${c.id}" may only contain letters, numbers, and hyphens. Fix it before saving.`);
+        return;
+      }
+    }
+
+    const ids = conditions.map(c => c.id);
+    const dupes = [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))];
+    if (dupes.length) {
+      ui.notifications.warn(`Duplicate ID(s): ${dupes.join(", ")}. Fix them before saving.`);
+      return;
+    }
 
     await game.settings.set(MODULE_ID, SETTING_KEY, conditions);
     window.location.reload();
@@ -151,7 +145,9 @@ class ShinysStatusEffectsConfig extends FormApplication {
 
   _onExport(event) {
     event.preventDefault();
-    const conditions = game.settings.get(MODULE_ID, SETTING_KEY) ?? [];
+    this._syncFromDom();
+
+    const conditions = this._conditions.filter(c => c.id && c.name && c.img);
     const data = JSON.stringify(conditions, null, 2);
 
     // Foundry's own helper reliably triggers a real file download instead
@@ -174,8 +170,8 @@ class ShinysStatusEffectsConfig extends FormApplication {
       const imported = JSON.parse(text);
       if (!Array.isArray(imported)) throw new Error("Expected a JSON array");
 
-      const conditions = foundry.utils.deepClone(game.settings.get(MODULE_ID, SETTING_KEY) ?? []);
-      const existingIds = new Set(conditions.map(c => c.id));
+      this._syncFromDom();
+      const existingIds = new Set(this._conditions.map(c => c.id));
 
       let added = 0;
       let skipped = 0;
@@ -185,13 +181,12 @@ class ShinysStatusEffectsConfig extends FormApplication {
           skipped++;
           continue;
         }
-        conditions.push({ id: entry.id, name: entry.name, img: entry.img });
+        this._conditions.push({ id: entry.id, name: entry.name, img: entry.img });
         existingIds.add(entry.id);
         added++;
       }
 
-      await game.settings.set(MODULE_ID, SETTING_KEY, conditions);
-      ui.notifications.info(`Imported ${added} condition(s)${skipped ? `, skipped ${skipped} (missing fields or duplicate ID)` : ""}.`);
+      ui.notifications.info(`Imported ${added} condition(s)${skipped ? `, skipped ${skipped} (missing fields or duplicate ID)` : ""}. Press "Save & Reload" to keep them.`);
       this.render();
     } catch (err) {
       console.error(`${MODULE_ID} | Import failed:`, err);
@@ -202,7 +197,7 @@ class ShinysStatusEffectsConfig extends FormApplication {
   }
 
   async _updateObject() {
-    // Saving happens per-row on change, nothing to do on submit.
+    // Saving only happens via the "Save & Reload" button.
   }
 }
 
@@ -253,7 +248,6 @@ class ShinysBuiltinConditionsConfig extends FormApplication {
 
     html.find(".pick-image-builtin").on("click", (ev) => this._openFilePicker(ev, ".builtin-img"));
     html.find(".builtin-img").on("input", this._onImgPreview.bind(this));
-    html.find(".builtin-row input").on("change", this._onBuiltinChange.bind(this));
     html.find(".reset-builtin").on("click", this._onBuiltinReset.bind(this));
     html.find(".save-reload").on("click", this._onSaveAndReload.bind(this));
   }
@@ -280,37 +274,18 @@ class ShinysBuiltinConditionsConfig extends FormApplication {
     if (preview) preview.src = event.currentTarget.value;
   }
 
-  async _onBuiltinChange(event) {
-    const row = event.currentTarget.closest(".builtin-row");
-    const id = row.dataset.id;
-
-    const overrides = foundry.utils.deepClone(game.settings.get(MODULE_ID, OVERRIDE_KEY) ?? {});
-
-    const name = row.querySelector(".builtin-name").value.trim();
-    const img = row.querySelector(".builtin-img").value.trim();
-    const visibleInHud = row.querySelector(".builtin-visible").checked;
-
-    const next = {};
-    if (name) next.name = name;
-    if (img) next.img = img;
-    if (!visibleInHud) next.hidden = true;
-
-    if (Object.keys(next).length === 0) delete overrides[id];
-    else overrides[id] = next;
-
-    await game.settings.set(MODULE_ID, OVERRIDE_KEY, overrides);
-  }
-
-  async _onBuiltinReset(event) {
+  _onBuiltinReset(event) {
     event.preventDefault();
     const row = event.currentTarget.closest(".builtin-row");
     const id = row.dataset.id;
 
-    const overrides = foundry.utils.deepClone(game.settings.get(MODULE_ID, OVERRIDE_KEY) ?? {});
-    delete overrides[id];
+    const def = SCSE_BUILTIN_DEFAULTS[id];
+    if (!def) return;
 
-    await game.settings.set(MODULE_ID, OVERRIDE_KEY, overrides);
-    this.render();
+    row.querySelector(".builtin-name").value = def.name;
+    row.querySelector(".builtin-img").value = def.img;
+    row.querySelector(".cond-preview").src = def.img;
+    row.querySelector(".builtin-visible").checked = true;
   }
 
   async _onSaveAndReload(event) {
@@ -335,7 +310,7 @@ class ShinysBuiltinConditionsConfig extends FormApplication {
   }
 
   async _updateObject() {
-    // Saving happens per-row on change, nothing to do on submit.
+    // Saving only happens via the "Save & Reload" button.
   }
 }
 
@@ -396,6 +371,17 @@ Hooks.once("init", () => {
 Hooks.once("setup", () => {
   const isArrayConfig = Array.isArray(CONFIG.statusEffects);
   const allEffectsBefore = isArrayConfig ? CONFIG.statusEffects : Object.values(CONFIG.statusEffects);
+
+  // Remember each built-in condition's untouched name/icon BEFORE any
+  // override is applied, so the management screen can reset a row back
+  // to this without needing a reload.
+  for (const entry of allEffectsBefore) {
+    if (!entry.id) continue;
+    SCSE_BUILTIN_DEFAULTS[entry.id] = {
+      name: game.i18n.localize(entry.name || entry.label || entry.id),
+      img: entry.img || entry.icon || ""
+    };
+  }
 
   // Apply overrides (rename / re-icon / hide) to whatever the system and
   // core have already registered before we add our own conditions.

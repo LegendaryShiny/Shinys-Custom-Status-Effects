@@ -8,9 +8,9 @@ menu — no file editing required.
 ## Managing your own conditions
 
 1. In your world: **Game Settings → Configure Settings → Module Settings**
-2. Under "Shiny's Custom Status Effects", click **"Manage Conditions"**
-3. Edit any field directly in the table (ID, Name, Icon path) — changes
-   save automatically when you click away from a field
+2. Under "Shiny's Custom Status Effects", click
+   **"Manage Custom Conditions"**
+3. Edit any field directly in the table (ID, Name, Icon path)
 4. Use the file-picker button next to the Icon field to browse Foundry's
    built-in icons (`icons/svg/...`) or your own images
 5. Click **"+ Add Condition"** for a new blank row, or the trash icon to
@@ -19,15 +19,17 @@ menu — no file editing required.
    **Import** to add conditions from a previously exported file (existing
    IDs are skipped, so importing is safe to repeat) — handy for carrying
    your set over to another world
-7. Reload Foundry (F5), or use **Save & Reload**, so the Token HUD
-   reflects your changes
+7. Click **Save & Reload** to save your changes and refresh Foundry —
+   nothing is written until you do this, so closing the window instead
+   discards your edits
 
 Conditions are stored as a world-scoped setting, so they apply for
 everyone in that world.
 
 ## Managing built-in conditions
 
-Click **"Manage Built-in Conditions"** (next to "Manage Conditions") to
+Click **"Manage Standard Conditions"** (next to "Manage Custom
+Conditions") to
 rename, re-icon, or hide any of the system's default conditions from the
 Token HUD — without deleting them. Use the checkbox in the "In HUD"
 column to hide one, and the reset icon to restore its original name/icon.

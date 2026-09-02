@@ -303,6 +303,15 @@ Hooks.once("init", () => {
     default: {}
   });
 
+  game.settings.register(MODULE_ID, "showHoverEffects", {
+    name: "Show active conditions on hover",
+    hint: "When hovering over a token, display a small panel next to it listing that token's active conditions with icon and name.",
+    scope: "client",
+    config: true,
+    type: Boolean,
+    default: true
+  });
+
   game.settings.registerMenu(MODULE_ID, "customConditionsMenu", {
     name: "Custom Conditions",
     label: "Manage Conditions",
@@ -465,3 +474,109 @@ Hooks.on("renderTokenHUD", (_app, html) => {
     gridItem.style.order = index;
   });
 });
+
+/* -------------------------------------------- */
+/*  Hover panel: active conditions + names       */
+/* -------------------------------------------- */
+
+const HOVER_SETTING_KEY = "showHoverEffects";
+let scseHoverPanel = null;
+
+function scseGetActiveStatuses(token) {
+  const actor = token.actor;
+  if (!actor) return [];
+
+  const isArrayConfig = Array.isArray(CONFIG.statusEffects);
+  const allEffects = isArrayConfig ? CONFIG.statusEffects : Object.values(CONFIG.statusEffects);
+
+  let ids = [];
+  if (actor.statuses instanceof Set) {
+    // Modern Foundry: Actor#statuses is a Set of active status IDs
+    ids = Array.from(actor.statuses);
+  } else if (Array.isArray(token.document?.effects)) {
+    // Fallback for older versions: effects is an array of icon paths
+    ids = token.document.effects
+      .map(src => allEffects.find(e => (e.img || e.icon) === src)?.id)
+      .filter(Boolean);
+  }
+
+  return ids
+    .map(id => allEffects.find(e => e.id === id))
+    .filter(Boolean)
+    .map(e => ({
+      name: game.i18n.localize(e.name || e.label || e.id),
+      img: e.img || e.icon || ""
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function scseShowHoverPanel(token) {
+  if (!game.settings.get(MODULE_ID, HOVER_SETTING_KEY)) return;
+
+  const statuses = scseGetActiveStatuses(token);
+  scseHideHoverPanel();
+  if (!statuses.length) return;
+
+  const panel = document.createElement("div");
+  panel.id = "scse-hover-panel";
+
+  for (const s of statuses) {
+    const row = document.createElement("div");
+    row.className = "scse-hover-row";
+
+    if (s.img) {
+      const img = document.createElement("img");
+      img.src = s.img;
+      row.appendChild(img);
+    }
+
+    const label = document.createElement("span");
+    label.textContent = s.name;
+    row.appendChild(label);
+
+    panel.appendChild(row);
+  }
+
+  document.body.appendChild(panel);
+  scseHoverPanel = panel;
+  scsePositionHoverPanel(token);
+}
+
+function scsePositionHoverPanel(token) {
+  if (!scseHoverPanel || !canvas?.app?.view) return;
+
+  const canvasRect = canvas.app.view.getBoundingClientRect();
+  const global = token.getGlobalPosition ? token.getGlobalPosition() : { x: token.x, y: token.y };
+  const scale = canvas.stage?.scale?.x ?? 1;
+  const tokenWidthPx = (token.w ?? 0) * scale;
+
+  scseHoverPanel.style.left = `${canvasRect.left + global.x + tokenWidthPx + 8}px`;
+  scseHoverPanel.style.top = `${canvasRect.top + global.y}px`;
+}
+
+function scseHideHoverPanel() {
+  if (scseHoverPanel) {
+    scseHoverPanel.remove();
+    scseHoverPanel = null;
+  }
+}
+
+Hooks.on("hoverToken", (token, hovered) => {
+  if (hovered) scseShowHoverPanel(token);
+  else scseHideHoverPanel();
+});
+
+// If conditions change on the actor currently being hovered, refresh
+// the panel's contents instead of leaving it stale.
+Hooks.on("updateActor", (actor) => {
+  const hovered = canvas.tokens?.hover;
+  if (hovered?.actor === actor) scseShowHoverPanel(hovered);
+});
+
+// Keep the panel glued to the token while panning/zooming
+Hooks.on("canvasPan", () => {
+  if (scseHoverPanel && canvas.tokens?.hover) scsePositionHoverPanel(canvas.tokens.hover);
+});
+
+// Clear any leftover panel when switching scenes
+Hooks.on("canvasReady", scseHideHoverPanel);

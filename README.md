@@ -22,6 +22,14 @@ menu — no file editing required.
 Conditions are stored as a world-scoped setting, so they apply for
 everyone in that world.
 
+## Hover panel
+
+When you hover over a token, a small panel appears next to it listing
+that token's currently active conditions with icon and name — handy since
+the Token HUD icons alone don't show text. Toggle this on/off per-player
+under **Game Settings → Configure Settings → Module Settings →
+"Show active conditions on hover"**.
+
 ## Updating this module on GitHub
 
 This module is installed straight from raw files on the `main` branch —

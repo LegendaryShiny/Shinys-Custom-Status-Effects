@@ -369,7 +369,7 @@ Hooks.once("init", () => {
 
   game.settings.registerMenu(MODULE_ID, "customConditionsMenu", {
     name: "Custom Conditions",
-    label: "Manage Conditions",
+    label: "Manage Custom Conditions",
     hint: "Add, edit, or remove custom conditions (e.g. for spell effects).",
     icon: "fas fa-star",
     type: ShinysStatusEffectsConfig,
@@ -378,7 +378,7 @@ Hooks.once("init", () => {
 
   game.settings.registerMenu(MODULE_ID, "builtinConditionsMenu", {
     name: "Built-in Conditions",
-    label: "Manage Built-in Conditions",
+    label: "Manage Standard Conditions",
     hint: "Rename, re-icon, or hide the system's default conditions from the Token HUD.",
     icon: "fas fa-shield-halved",
     type: ShinysBuiltinConditionsConfig,

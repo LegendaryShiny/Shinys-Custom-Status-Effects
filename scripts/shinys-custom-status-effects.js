@@ -363,35 +363,9 @@ Hooks.once("setup", () => {
     }
   }
 
-  sortStatusEffectsAlphabetically();
-
   console.log(`${MODULE_ID} | ${conditions.length} custom condition(s) loaded, ${Object.keys(overrides).length} built-in override(s) applied`);
 });
 
-/**
- * Sorts CONFIG.statusEffects alphabetically by (localized) name, mixing
- * custom and built-in conditions together instead of grouping them by
- * when they were registered.
- */
-function sortStatusEffectsAlphabetically() {
-  const getName = (e) => game.i18n.localize(e.name || e.label || e.id || "");
-
-  if (Array.isArray(CONFIG.statusEffects)) {
-    CONFIG.statusEffects.sort((a, b) => getName(a).localeCompare(getName(b)));
-    return;
-  }
-
-  // Object-keyed (v13+): reinsert entries in sorted order (JS objects
-  // iterate string keys in insertion order) AND set an explicit "order"
-  // field in case the HUD renders by that instead.
-  const entries = Object.entries(CONFIG.statusEffects)
-    .sort(([, a], [, b]) => getName(a).localeCompare(getName(b)));
-
-  entries.forEach(([, entry], index) => { entry.order = index; });
-
-  for (const key of Object.keys(CONFIG.statusEffects)) delete CONFIG.statusEffects[key];
-  for (const [key, entry] of entries) CONFIG.statusEffects[key] = entry;
-}
 
 /* -------------------------------------------- */
 /*  Show the name next to each icon in the HUD   */
@@ -410,11 +384,13 @@ Hooks.on("renderTokenHUD", (_app, html) => {
   const isArrayConfig = Array.isArray(CONFIG.statusEffects);
   const allEffects = isArrayConfig ? CONFIG.statusEffects : Object.values(CONFIG.statusEffects);
 
+  // Collect {gridItem, label} for every icon so we can sort them visually
+  // afterwards, without touching CONFIG.statusEffects itself (mutating
+  // Foundry's own data structure turned out to be fragile).
+  const items = [];
+
   const controls = container.querySelectorAll(".effect-control");
   controls.forEach((el) => {
-    if (el.dataset.scseDone) return;
-    el.dataset.scseDone = "true";
-
     // Try to identify which status this icon represents, then look its
     // name up from CONFIG.statusEffects — far more reliable than scraping
     // a tooltip attribute, which isn't consistent across Foundry versions.
@@ -438,32 +414,54 @@ Hooks.on("renderTokenHUD", (_app, html) => {
 
     if (!label) {
       console.debug(`${MODULE_ID} | Could not determine a label for this icon:`, el);
+      items.push({ gridItem: el, label: "\uFFFF" }); // sort unlabeled icons last
       return;
     }
 
-    if (el.tagName === "IMG") {
-      // <img> elements can't render child nodes, so wrap the icon in a
-      // container that carries the same class/attributes (for Foundry's
-      // own click handling) and add the icon + label as its children.
-      const wrapper = document.createElement("div");
-      for (const attr of el.attributes) {
-        if (attr.name !== "class") wrapper.setAttribute(attr.name, attr.value);
+    let gridItem = el;
+
+    if (!el.dataset.scseDone) {
+      el.dataset.scseDone = "true";
+
+      if (el.tagName === "IMG") {
+        // <img> elements can't render child nodes, so wrap the icon in a
+        // container that carries the same class/attributes (for Foundry's
+        // own click handling) and add the icon + label as its children.
+        const wrapper = document.createElement("div");
+        for (const attr of el.attributes) {
+          if (attr.name !== "class") wrapper.setAttribute(attr.name, attr.value);
+        }
+        wrapper.className = `${el.className} scse-wrapper`;
+        el.classList.add("scse-icon-img");
+
+        el.replaceWith(wrapper);
+        wrapper.appendChild(el);
+
+        const span = document.createElement("span");
+        span.className = "scse-label";
+        span.textContent = label;
+        wrapper.appendChild(span);
+
+        gridItem = wrapper;
+      } else {
+        const span = document.createElement("span");
+        span.className = "scse-label";
+        span.textContent = label;
+        el.appendChild(span);
       }
-      wrapper.className = `${el.className} scse-wrapper`;
-      el.classList.add("scse-icon-img");
-
-      el.replaceWith(wrapper);
-      wrapper.appendChild(el);
-
-      const span = document.createElement("span");
-      span.className = "scse-label";
-      span.textContent = label;
-      wrapper.appendChild(span);
     } else {
-      const span = document.createElement("span");
-      span.className = "scse-label";
-      span.textContent = label;
-      el.appendChild(span);
+      // Already processed on an earlier pass (shouldn't normally happen
+      // within one render), find the wrapper if it exists.
+      gridItem = el.closest(".scse-wrapper") || el;
     }
+
+    items.push({ gridItem, label });
+  });
+
+  // Sort alphabetically and apply as CSS "order" on the actual grid
+  // items — purely visual, doesn't touch Foundry's underlying data.
+  items.sort((a, b) => a.label.localeCompare(b.label));
+  items.forEach(({ gridItem }, index) => {
+    gridItem.style.order = index;
   });
 });

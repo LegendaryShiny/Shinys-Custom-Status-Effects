@@ -199,3 +199,20 @@
   flex: 0 0 auto;
   border: none;
 }
+
+/* "Clear All" button pinned to the bottom of the status-effects palette */
+.status-effects.scse-enhanced .scse-clear-all {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid #666;
+  border-radius: 3px;
+  color: #eee;
+}
+
+.status-effects.scse-enhanced .scse-clear-all:hover {
+  background: rgba(255, 255, 255, 0.18);
+}

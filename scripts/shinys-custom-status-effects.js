@@ -473,7 +473,36 @@ Hooks.on("renderTokenHUD", (_app, html) => {
   items.forEach(({ gridItem }, index) => {
     gridItem.style.order = index;
   });
+
+  // "Clear All" button, pinned to the bottom of the palette regardless
+  // of sort order.
+  if (!container.querySelector(".scse-clear-all")) {
+    const token = _app.object ?? _app.token;
+
+    const clearBtn = document.createElement("button");
+    clearBtn.type = "button";
+    clearBtn.className = "scse-clear-all";
+    clearBtn.textContent = "Clear All";
+    clearBtn.style.order = 999999;
+    clearBtn.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      scseClearAllStatuses(token);
+    });
+
+    container.appendChild(clearBtn);
+  }
 });
+
+async function scseClearAllStatuses(token) {
+  const actor = token?.actor;
+  if (!actor) return;
+
+  const ids = actor.statuses instanceof Set ? Array.from(actor.statuses) : [];
+  for (const id of ids) {
+    await actor.toggleStatusEffect(id, { active: false });
+  }
+}
 
 /* -------------------------------------------- */
 /*  Hover panel: active conditions + names       */

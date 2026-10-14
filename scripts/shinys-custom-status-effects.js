@@ -711,6 +711,7 @@ for (const hookName of ["createActiveEffect", "updateActiveEffect", "deleteActiv
   Hooks.on(hookName, (effect) => {
     const hovered = canvas.tokens?.hover;
     if (hovered && hovered.actor === effect.parent) scseShowHoverPanel(hovered);
+    scseSyncActorTokens(effect.parent);
   });
 }
 
@@ -740,24 +741,45 @@ function scseGetStacks(actor, statusId) {
   return effect.getFlag(MODULE_ID, STACKS_FLAG) ?? 1;
 }
 
+const scseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Brings the actor into the wanted state: 0 = condition off, otherwise the
+// condition on with exactly this many stacks. Safe to call repeatedly — it
+// only changes what doesn't match yet.
+async function scseEnsureState(actor, statusId, count) {
+  let effect = scseFindEffect(actor, statusId);
+
+  if (count === 0) {
+    if (effect) await actor.toggleStatusEffect(statusId, { active: false });
+    return;
+  }
+
+  if (!effect) {
+    // Let Foundry (and the game system) create the effect the normal way.
+    await actor.toggleStatusEffect(statusId, { active: true });
+    effect = scseFindEffect(actor, statusId);
+  }
+
+  if (effect && effect.getFlag(MODULE_ID, STACKS_FLAG) !== count) {
+    await effect.setFlag(MODULE_ID, STACKS_FLAG, count);
+  }
+}
+
 // Adds (+1) or removes (-1) a stack. Returns the new count.
 async function scseChangeStacks(actor, statusId, delta, max) {
   const current = scseGetStacks(actor, statusId);
   const next = Math.min(Math.max(current + delta, 0), max);
   if (next === current) return current;
 
-  if (next === 0) {
-    await actor.toggleStatusEffect(statusId, { active: false });
-    return 0;
+  try {
+    await scseEnsureState(actor, statusId, next);
+  } catch (err) {
+    // Typically: the effect was removed by something else while we were
+    // updating it. Wait a moment, then simply try again from the fresh state.
+    console.warn(`${MODULE_ID} | Stack change failed, retrying once:`, err);
+    await scseDelay(250);
+    await scseEnsureState(actor, statusId, next);
   }
-
-  if (current === 0) {
-    // Let Foundry (and the game system) create the effect the normal way.
-    await actor.toggleStatusEffect(statusId, { active: true });
-  }
-
-  const effect = scseFindEffect(actor, statusId);
-  await effect?.setFlag(MODULE_ID, STACKS_FLAG, next);
   return next;
 }
 
@@ -793,48 +815,222 @@ function scseRefreshHudBadges(actor) {
   }
 }
 
-// Remembers which actor+status combos are mid-change, so a fast double
-// click can't read the old count twice.
-const scseBusy = new Set();
+/* -------------------------------------------- */
+/*  Token HUD clicks for stackable conditions    */
+/* -------------------------------------------- */
 
-// Runs BEFORE Foundry's own click handling (capture phase, see below).
-// For stackable conditions we take over the click completely; for every
-// other icon we do nothing and Foundry works as usual.
-async function scseOnHudClick(event) {
+// Clicks of one actor+status are handled strictly one after another, so
+// quick repeated clicks add up correctly instead of racing each other.
+const scseQueues = new Map();     // "actor|status" -> last queued job
+const scseExpected = new Map();   // "actor|status" -> stack count we last set
+const scseVerifyTimers = new Map();
+
+function scseEnqueue(key, job) {
+  const previous = scseQueues.get(key) ?? Promise.resolve();
+  const current = previous.catch(() => {}).then(job);
+  scseQueues.set(key, current);
+  current
+    .catch(() => {})
+    .then(() => { if (scseQueues.get(key) === current) scseQueues.delete(key); });
+  return current;
+}
+
+// A moment after the last click: check once that the actor really ended up
+// in the state we wanted (in case something else touched the effect).
+function scseScheduleVerify(key, actor, statusId) {
+  clearTimeout(scseVerifyTimers.get(key));
+  scseVerifyTimers.set(key, setTimeout(() => {
+    scseEnqueue(key, async () => {
+      const expected = scseExpected.get(key);
+      scseExpected.delete(key);
+      if (expected === undefined) return;
+      await scseEnsureState(actor, statusId, expected);
+      scseRefreshHudBadges(actor);
+      scseSyncActorTokens(actor);
+    }).catch((err) => console.warn(`${MODULE_ID} | Verification failed:`, err));
+  }, 350));
+}
+
+// The mouse events we take over for stackable icons. Foundry might react to
+// any of them (depending on version), so we swallow all of them — but only
+// act on "click" (+1) and "contextmenu" = right click (-1).
+const SCSE_MOUSE_EVENTS = ["pointerdown", "mousedown", "pointerup", "mouseup", "click", "auxclick", "contextmenu"];
+
+function scseOnHudEvent(event) {
   const control = event.target?.closest?.(".effect-control");
   if (!control || !control.closest(".status-effects.scse-enhanced")) return;
 
   const statusId = scseGetStatusId(control);
   const max = SCSE_STACK_MAX[statusId];
-  if (!max) return;
+  if (!max) return;   // normal condition -> Foundry handles it as usual
 
-  const actor = canvas.hud?.token?.object?.actor;
-  if (!actor) return;
-
-  // Stop Foundry's normal toggle (on/off) from also running.
+  // Stop Foundry's own handling (the normal on/off toggle).
   event.preventDefault();
   event.stopPropagation();
   event.stopImmediatePropagation();
 
-  const key = `${actor.uuid}|${statusId}`;
-  if (scseBusy.has(key)) return;
-  scseBusy.add(key);
+  if (event.type !== "click" && event.type !== "contextmenu") return;
 
-  try {
-    // Left click (click) = +1, right click (contextmenu) = -1
-    const delta = event.type === "contextmenu" ? -1 : 1;
-    await scseChangeStacks(actor, statusId, delta, max);
+  const actor = canvas.hud?.token?.object?.actor;
+  if (!actor) return;
+
+  // Left click = +1, right click = -1
+  const delta = event.type === "contextmenu" ? -1 : 1;
+  const key = `${actor.uuid}|${statusId}`;
+
+  scseEnqueue(key, async () => {
+    const next = await scseChangeStacks(actor, statusId, delta, max);
+    scseExpected.set(key, next);
     scseRefreshHudBadges(actor);
-  } catch (err) {
+    scseSyncActorTokens(actor);
+  }).catch((err) => {
     console.error(`${MODULE_ID} | Could not change stacks for "${statusId}":`, err);
     ui.notifications.error("Could not change the stack count — see the console (F12) for details.");
-  } finally {
-    scseBusy.delete(key);
-  }
+  });
+
+  scseScheduleVerify(key, actor, statusId);
 }
 
 Hooks.once("ready", () => {
-  // "true" = capture phase: our handler gets the event before Foundry does.
-  document.addEventListener("click", scseOnHudClick, true);
-  document.addEventListener("contextmenu", scseOnHudClick, true);
+  // Registered on "window" with capture = true: that is the very first stop
+  // on an event's way down, so we see it before Foundry or any system does.
+  for (const type of SCSE_MOUSE_EVENTS) window.addEventListener(type, scseOnHudEvent, true);
 });
+
+/* -------------------------------------------- */
+/*  Stack numbers on the token icons (canvas)    */
+/* -------------------------------------------- */
+
+// All places an icon's image address might be stored in, depending on the
+// PIXI version Foundry uses.
+function scseTextureSources(texture) {
+  const out = [];
+  const add = (v) => { if (typeof v === "string" && v) out.push(v); };
+  const base = texture?.baseTexture ?? texture?.source;
+  const res = base?.resource;
+
+  add(res?.src); add(res?.url); add(res?.currentSrc); add(res?.source?.src);
+  add(base?.cacheId); add(base?.label); add(texture?.label);
+  for (const list of [base?.textureCacheIds, texture?.textureCacheIds]) {
+    if (Array.isArray(list)) list.forEach(add);
+  }
+  return out;
+}
+
+// "https://host/path/My%20Icon.svg?x" -> "path/My Icon.svg" style comparison
+function scseNormSrc(src) {
+  let s = String(src ?? "");
+  try { s = decodeURIComponent(s); } catch { /* keep as is */ }
+  return s.split("?")[0].replace(/^\/+/, "");
+}
+
+function scseStatusImg(statusId) {
+  const all = Array.isArray(CONFIG.statusEffects) ? CONFIG.statusEffects : Object.values(CONFIG.statusEffects);
+  const cfg = all.find(e => e.id === statusId);
+  return cfg?.img || cfg?.icon || "";
+}
+
+function scseMakeBadgeText(str, iconSize) {
+  const TextClass = foundry.canvas?.containers?.PreciseText ?? globalThis.PreciseText ?? PIXI.Text;
+  const fontSize = Math.max(10, Math.round(iconSize * 0.8));
+  const style = CONFIG.canvasTextStyle?.clone?.() ?? new PIXI.TextStyle();
+  style.fontSize = fontSize;
+  style.fontWeight = "bold";
+  style.fill = 0xFFFFFF;
+  style.stroke = 0x000000;
+  style.strokeThickness = Math.max(2, Math.round(fontSize / 4));
+  style.dropShadow = false;
+  return new TextClass(str, style);
+}
+
+// Puts the stack count on the matching status icon of one token.
+function scseDrawTokenBadges(token) {
+  if (!token?.effects || token.destroyed) return;
+  const actor = token.actor;
+
+  // Active stackable conditions on this token
+  const entries = [];
+  if (actor) {
+    for (const id of Object.keys(SCSE_STACK_MAX)) {
+      const stacks = scseGetStacks(actor, id);
+      if (stacks > 0) entries.push({ id, stacks, img: scseNormSrc(scseStatusImg(id)) });
+    }
+  }
+
+  let layer = token.scseBadgeLayer;
+  if (layer?.destroyed) layer = token.scseBadgeLayer = null;
+
+  if (!entries.length) {
+    if (layer) { layer.removeChildren().forEach(c => c.destroy()); layer._scseSig = ""; }
+    return;
+  }
+
+  // Match each icon sprite on the token to a stackable condition by its image
+  const placements = [];
+  const used = new Set();
+  for (const sprite of token.effects.children) {
+    if (!sprite.texture || sprite === token.effects.overlay || !(sprite.width > 0)) continue;
+    const sources = scseTextureSources(sprite.texture).map(scseNormSrc);
+    const entry = entries.find(e => !used.has(e) && e.img && sources.some(s => s.endsWith(e.img)));
+    if (!entry) continue;
+    used.add(entry);
+    placements.push({
+      entry,
+      x: token.effects.x + sprite.x + sprite.width,
+      y: token.effects.y + sprite.y + sprite.height,
+      size: sprite.width
+    });
+  }
+
+  if (!placements.length) {
+    if (!token._scseWarned) {
+      token._scseWarned = true;
+      console.debug(`${MODULE_ID} | Could not match a token icon for stack badge.`,
+        { wanted: entries.map(e => e.img), icons: token.effects.children.map(c => c.texture && scseTextureSources(c.texture)) });
+    }
+    return;
+  }
+
+  // Only rebuild when something actually changed (this runs very often)
+  const sig = JSON.stringify(placements.map(p => [p.entry.id, p.entry.stacks, Math.round(p.x), Math.round(p.y), Math.round(p.size)]));
+  if (layer && layer._scseSig === sig) return;
+
+  if (!layer) {
+    layer = new PIXI.Container();
+    try { layer.eventMode = "none"; } catch { /* older PIXI */ }
+    layer.interactiveChildren = false;
+    token.scseBadgeLayer = layer;
+    token.addChild(layer);
+  }
+
+  layer.removeChildren().forEach(c => c.destroy());
+  for (const p of placements) {
+    const text = scseMakeBadgeText(String(p.entry.stacks), p.size);
+    text.anchor.set(1, 1);   // bottom-right corner of the icon
+    text.position.set(p.x, p.y);
+    layer.addChild(text);
+  }
+  layer._scseSig = sig;
+}
+
+// Never let a drawing problem break the token itself.
+function scseSyncTokenBadges(token) {
+  try {
+    scseDrawTokenBadges(token);
+  } catch (err) {
+    console.debug(`${MODULE_ID} | Stack badge on token failed:`, err);
+  }
+}
+
+// Effects are (re)drawn asynchronously, so check again shortly after.
+function scseSyncActorTokens(actor) {
+  const tokens = actor?.getActiveTokens?.() ?? [];
+  for (const token of tokens) {
+    scseSyncTokenBadges(token);
+    setTimeout(() => scseSyncTokenBadges(token), 250);
+  }
+}
+
+// Fires whenever a token is redrawn/refreshed (including after its status
+// icons were laid out).
+Hooks.on("refreshToken", (token) => scseSyncTokenBadges(token));

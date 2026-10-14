@@ -34,8 +34,9 @@ Leave it at **1** for a normal on/off condition. Set it to **2 or higher**
 
 - **Left-click** the icon in the Token HUD to add a stack (up to the maximum)
 - **Right-click** to remove a stack — at 0 the condition is removed
-- The HUD shows the current count as a badge (e.g. `3/6`), and the hover
-  panel lists it as `Name ×3`
+- The HUD shows the current count as a badge (e.g. `3/6`), the hover
+  panel lists it as `Name ×3`, and the number is also drawn on the
+  condition's icon on the token itself
 
 The stack count is stored on the token's active effect, so it is removed
 together with the condition. The Stacks value is included in Export/Import.

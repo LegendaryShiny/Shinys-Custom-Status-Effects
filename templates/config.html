@@ -4,6 +4,11 @@
     you press "Save &amp; Reload" — closing this window without saving
     discards your changes.
   </p>
+  <p class="notes">
+    <strong>Stacks:</strong> leave at 1 for a normal on/off condition. Set it
+    to 2 or higher to make the condition stackable, like Exhaustion — in the
+    Token HUD, left-click adds a stack and right-click removes one.
+  </p>
 
   <table class="scse-list">
     <thead>
@@ -12,6 +17,7 @@
         <th>ID</th>
         <th>Name</th>
         <th>Icon</th>
+        <th style="width: 64px;" title="Maximum stacks (1 = normal on/off condition)">Stacks</th>
         <th style="width: 32px;"></th>
       </tr>
     </thead>
@@ -29,6 +35,7 @@
             </button>
           </div>
         </td>
+        <td><input type="number" class="cond-max" min="1" max="99" step="1" value="{{c.max}}" placeholder="1"></td>
         <td>
           <a class="delete-condition" title="Delete">
             <i class="fas fa-trash"></i>
@@ -36,7 +43,7 @@
         </td>
       </tr>
       {{else}}
-      <tr><td colspan="5"><em>No custom conditions yet.</em></td></tr>
+      <tr><td colspan="6"><em>No custom conditions yet.</em></td></tr>
       {{/each}}
     </tbody>
   </table>

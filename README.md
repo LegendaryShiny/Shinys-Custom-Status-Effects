@@ -26,6 +26,20 @@ menu — no file editing required.
 Conditions are stored as a world-scoped setting, so they apply for
 everyone in that world.
 
+## Stackable conditions (like Exhaustion)
+
+Each custom condition has a **Stacks** field in the management table.
+Leave it at **1** for a normal on/off condition. Set it to **2 or higher**
+(up to 99) to make the condition stackable:
+
+- **Left-click** the icon in the Token HUD to add a stack (up to the maximum)
+- **Right-click** to remove a stack — at 0 the condition is removed
+- The HUD shows the current count as a badge (e.g. `3/6`), and the hover
+  panel lists it as `Name ×3`
+
+The stack count is stored on the token's active effect, so it is removed
+together with the condition. The Stacks value is included in Export/Import.
+
 ## Managing built-in conditions
 
 Click **"Manage Standard Conditions"** (next to "Manage Custom

@@ -3,6 +3,8 @@
  * - Registers custom conditions in CONFIG.statusEffects (Token HUD)
  * - Settings menu with inline editing (no delete+recreate needed)
  * - Shows each condition's name next to its icon in the Token HUD
+ * - Optional "stackable" conditions (like Exhaustion): left-click in the
+ *   Token HUD adds a stack, right-click removes one
  */
 
 const MODULE_ID = "shinys-custom-status-effects";
@@ -17,6 +19,19 @@ const DEFAULT_CONDITIONS = [
 // name/icon, before any saved override is applied — lets the management
 // screen reset a row without needing a reload.
 const SCSE_BUILTIN_DEFAULTS = {};
+
+// Condition id -> max stacks, only for custom conditions with max > 1.
+// Filled in the "setup" hook. Anything not listed here behaves as a normal
+// on/off status. The current stack count lives on the ActiveEffect itself,
+// as a flag (see STACKS_FLAG).
+const SCSE_STACK_MAX = {};
+const STACKS_FLAG = "stacks";
+
+// Turns whatever is in the "Stacks" input into a whole number from 1 to 99.
+function scseParseMax(value) {
+  const n = parseInt(value, 10);
+  return Number.isFinite(n) ? Math.min(Math.max(n, 1), 99) : 1;
+}
 
 /* -------------------------------------------- */
 /*  Settings menu (FormApplication)              */
@@ -71,7 +86,8 @@ class ShinysStatusEffectsConfig extends FormApplication {
       const id = row.querySelector(".cond-id")?.value.trim() ?? "";
       const name = row.querySelector(".cond-name")?.value.trim() ?? "";
       const img = row.querySelector(".cond-img")?.value.trim() ?? "";
-      conditions.push({ id, name, img });
+      const max = scseParseMax(row.querySelector(".cond-max")?.value);
+      conditions.push({ id, name, img, max });
     });
     this._conditions = conditions;
   }
@@ -114,7 +130,7 @@ class ShinysStatusEffectsConfig extends FormApplication {
 
     let n = 1;
     while (this._conditions.some(c => c.id === `new-effect-${n}`)) n++;
-    this._conditions.push({ id: `new-effect-${n}`, name: "New Effect", img: "icons/svg/aura.svg" });
+    this._conditions.push({ id: `new-effect-${n}`, name: "New Effect", img: "icons/svg/aura.svg", max: 1 });
 
     this.render();
   }
@@ -181,7 +197,7 @@ class ShinysStatusEffectsConfig extends FormApplication {
           skipped++;
           continue;
         }
-        this._conditions.push({ id: entry.id, name: entry.name, img: entry.img });
+        this._conditions.push({ id: entry.id, name: entry.name, img: entry.img, max: scseParseMax(entry.max) });
         existingIds.add(entry.id);
         added++;
       }
@@ -397,6 +413,9 @@ Hooks.once("setup", () => {
   const conditions = game.settings.get(MODULE_ID, SETTING_KEY) ?? [];
 
   for (const condition of conditions) {
+    const maxStacks = scseParseMax(condition.max);
+    if (maxStacks > 1) SCSE_STACK_MAX[condition.id] = maxStacks;
+
     const entry = {
       id: condition.id,
       name: condition.name,
@@ -439,16 +458,15 @@ Hooks.on("renderTokenHUD", (_app, html) => {
   // Foundry's own data structure turned out to be fragile).
   const items = [];
 
+  // The actor behind this HUD, needed to show stack counts.
+  const hudActor = (_app.object ?? _app.token)?.actor;
+
   const controls = container.querySelectorAll(".effect-control");
   controls.forEach((el) => {
     // Try to identify which status this icon represents, then look its
     // name up from CONFIG.statusEffects — far more reliable than scraping
     // a tooltip attribute, which isn't consistent across Foundry versions.
-    const statusId = el.dataset.statusId
-      || el.getAttribute("data-status-id")
-      || el.dataset.effect
-      || el.getAttribute("data-effect")
-      || "";
+    const statusId = scseGetStatusId(el);
 
     let cfg = statusId ? allEffects.find(e => e.id === statusId) : null;
 
@@ -506,6 +524,9 @@ Hooks.on("renderTokenHUD", (_app, html) => {
     }
 
     items.push({ gridItem, label });
+
+    // Stackable conditions get a "3/6" badge (and the active highlight).
+    scseApplyStackBadge(gridItem, statusId, hudActor);
   });
 
   // Sort alphabetically and apply as CSS "order" on the actual grid
@@ -572,6 +593,9 @@ async function scseClearAllStatuses(token) {
   for (const id of ids) {
     await actor.toggleStatusEffect(id, { active: false });
   }
+
+  // Stack badges in the open HUD would otherwise keep showing old counts.
+  scseRefreshHudBadges(actor);
 }
 
 /* -------------------------------------------- */
@@ -604,7 +628,8 @@ function scseGetActiveStatuses(token) {
     .filter(Boolean)
     .map(e => ({
       name: game.i18n.localize(e.name || e.label || e.id),
-      img: e.img || e.icon || ""
+      img: e.img || e.icon || "",
+      stacks: SCSE_STACK_MAX[e.id] ? scseGetStacks(actor, e.id) : 1
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -630,7 +655,7 @@ function scseShowHoverPanel(token) {
     }
 
     const label = document.createElement("span");
-    label.textContent = s.name;
+    label.textContent = s.stacks > 1 ? `${s.name} ×${s.stacks}` : s.name;
     row.appendChild(label);
 
     panel.appendChild(row);
@@ -679,3 +704,137 @@ Hooks.on("canvasPan", () => {
 
 // Clear any leftover panel when switching scenes
 Hooks.on("canvasReady", scseHideHoverPanel);
+
+// Changing a stack count only touches the ActiveEffect (not the Actor), so
+// the panel needs to listen for effect changes too.
+for (const hookName of ["createActiveEffect", "updateActiveEffect", "deleteActiveEffect"]) {
+  Hooks.on(hookName, (effect) => {
+    const hovered = canvas.tokens?.hover;
+    if (hovered && hovered.actor === effect.parent) scseShowHoverPanel(hovered);
+  });
+}
+
+/* -------------------------------------------- */
+/*  Stackable conditions (like Exhaustion)       */
+/* -------------------------------------------- */
+
+// Reads which status an icon in the Token HUD stands for.
+function scseGetStatusId(el) {
+  return el.dataset?.statusId
+    || el.getAttribute?.("data-status-id")
+    || el.dataset?.effect
+    || el.getAttribute?.("data-effect")
+    || "";
+}
+
+// The ActiveEffect on this actor that carries the given status, if any.
+function scseFindEffect(actor, statusId) {
+  return actor.effects.find(e => e.statuses?.has(statusId));
+}
+
+// Current stack count: 0 = not active, otherwise the stored number
+// (an effect without a stored number counts as 1 stack).
+function scseGetStacks(actor, statusId) {
+  const effect = scseFindEffect(actor, statusId);
+  if (!effect) return 0;
+  return effect.getFlag(MODULE_ID, STACKS_FLAG) ?? 1;
+}
+
+// Adds (+1) or removes (-1) a stack. Returns the new count.
+async function scseChangeStacks(actor, statusId, delta, max) {
+  const current = scseGetStacks(actor, statusId);
+  const next = Math.min(Math.max(current + delta, 0), max);
+  if (next === current) return current;
+
+  if (next === 0) {
+    await actor.toggleStatusEffect(statusId, { active: false });
+    return 0;
+  }
+
+  if (current === 0) {
+    // Let Foundry (and the game system) create the effect the normal way.
+    await actor.toggleStatusEffect(statusId, { active: true });
+  }
+
+  const effect = scseFindEffect(actor, statusId);
+  await effect?.setFlag(MODULE_ID, STACKS_FLAG, next);
+  return next;
+}
+
+// Shows the "3/6" badge on a stackable icon in the Token HUD and keeps its
+// "active" highlight in sync. Does nothing for normal conditions.
+function scseApplyStackBadge(gridItem, statusId, actor) {
+  const max = SCSE_STACK_MAX[statusId];
+  if (!max) return;
+
+  const stacks = actor ? scseGetStacks(actor, statusId) : 0;
+
+  let badge = gridItem.querySelector(":scope > .scse-stack");
+  if (!badge) {
+    badge = document.createElement("span");
+    badge.className = "scse-stack";
+    gridItem.appendChild(badge);
+  }
+  badge.textContent = `${stacks}/${max}`;
+  badge.hidden = stacks < 1;
+
+  gridItem.classList.toggle("active", stacks > 0);
+  gridItem.querySelector(".scse-icon-img")?.classList.toggle("active", stacks > 0);
+}
+
+// Updates all badges of the currently open Token HUD.
+function scseRefreshHudBadges(actor) {
+  const container = document.querySelector(".status-effects.scse-enhanced");
+  if (!container || !actor) return;
+
+  for (const gridItem of container.children) {
+    const statusId = scseGetStatusId(gridItem);
+    if (statusId) scseApplyStackBadge(gridItem, statusId, actor);
+  }
+}
+
+// Remembers which actor+status combos are mid-change, so a fast double
+// click can't read the old count twice.
+const scseBusy = new Set();
+
+// Runs BEFORE Foundry's own click handling (capture phase, see below).
+// For stackable conditions we take over the click completely; for every
+// other icon we do nothing and Foundry works as usual.
+async function scseOnHudClick(event) {
+  const control = event.target?.closest?.(".effect-control");
+  if (!control || !control.closest(".status-effects.scse-enhanced")) return;
+
+  const statusId = scseGetStatusId(control);
+  const max = SCSE_STACK_MAX[statusId];
+  if (!max) return;
+
+  const actor = canvas.hud?.token?.object?.actor;
+  if (!actor) return;
+
+  // Stop Foundry's normal toggle (on/off) from also running.
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation();
+
+  const key = `${actor.uuid}|${statusId}`;
+  if (scseBusy.has(key)) return;
+  scseBusy.add(key);
+
+  try {
+    // Left click (click) = +1, right click (contextmenu) = -1
+    const delta = event.type === "contextmenu" ? -1 : 1;
+    await scseChangeStacks(actor, statusId, delta, max);
+    scseRefreshHudBadges(actor);
+  } catch (err) {
+    console.error(`${MODULE_ID} | Could not change stacks for "${statusId}":`, err);
+    ui.notifications.error("Could not change the stack count — see the console (F12) for details.");
+  } finally {
+    scseBusy.delete(key);
+  }
+}
+
+Hooks.once("ready", () => {
+  // "true" = capture phase: our handler gets the event before Foundry does.
+  document.addEventListener("click", scseOnHudClick, true);
+  document.addEventListener("contextmenu", scseOnHudClick, true);
+});
